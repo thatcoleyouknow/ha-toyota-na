@@ -60,7 +60,7 @@ async def _auth_headers(self):
     }
 
 async def get_vehicle_status_17cyplus(self, vin):
-    """Vehicle status (doors, locks, windows, hood, hatch) for 21MM/17CYPLUS."""
+    """Vehicle status (doors, locks, windows, hood, hatch) for 21MM/24MM/17CYPLUS."""
     try:
         res = await self.api_get("v1/global/remote/status", {
             "VIN": vin, "vin": vin,
@@ -72,7 +72,7 @@ async def get_vehicle_status_17cyplus(self, vin):
     return None
 
 async def get_engine_status_17cyplus(self, vin):
-    """Engine status for 21MM/17CYPLUS."""
+    """Engine status for 21MM/24MM/17CYPLUS."""
     try:
         res = await self.api_get("v1/global/remote/engine-status", {"VIN": vin, "vin": vin})
         if res:
