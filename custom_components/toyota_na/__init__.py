@@ -144,7 +144,15 @@ async def async_setup(hass: HomeAssistant, _processed_config) -> bool:
                         await asyncio.sleep(10)
                         await coordinator.async_request_refresh()
                     elif vehicle.vin == vin and vehicle.subscribed:
-                        await vehicle.send_command(COMMAND_MAP[remote_action])
+                        command = COMMAND_MAP[remote_action]
+                        if not vehicle.supports_command(command):
+                            _LOGGER.warning(
+                                "Skipping %s for %s: Toyota reports this vehicle does not support this command",
+                                remote_action,
+                                vin,
+                            )
+                            break
+                        await vehicle.send_command(command)
                         break
 
                 _LOGGER.info("Handling service call %s for %s ", remote_action, vin)

@@ -31,7 +31,7 @@ class ToyotaNABaseEntity(CoordinatorEntity[list[ToyotaVehicle]]):
     @property
     def name(self):
         if self.vehicle is not None:
-            return f"{self.sensor_name} {self.device_info['name']}"
+            return self.sensor_name
 
     @property
     def unique_id(self):

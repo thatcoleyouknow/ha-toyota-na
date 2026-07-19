@@ -64,7 +64,9 @@ async def async_get_config_entry_diagnostics(
             pass
 
         try:
-            user_telemetry = await client.get_telemetry(vin, generation)
+            user_telemetry = await client.get_telemetry(
+                vin, region=vehicle.get("region", "US"), generation=generation
+            )
         except Exception:
             pass
 
