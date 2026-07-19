@@ -20,6 +20,20 @@ REFRESH = "refresh"
 UPDATE_INTERVAL = 600
 REFRESH_STATUS_INTERVAL = 2 * 3600
 
+# hass.data[DOMAIN][VIN_CLAIMS] is a shared {vin: entry_id} map, used so that a vehicle visible
+# to two Toyota accounts (e.g. Toyota "family sharing") is only ever managed by one config entry
+# at a time -- see async_claim_vehicles()/async_release_vehicle_claims() in __init__.py.
+VIN_CLAIMS = "vin_claims"
+
+# entry.options key: list of VINs a config entry has been told NOT to manage, even though its
+# Toyota account can see them. Set via the integration's Configure (options) flow. Absent/empty
+# means "manage every vehicle this account can see", which is today's behavior unchanged.
+OPT_EXCLUDED_VINS = "excluded_vins"
+
+# Options flow form field name for the vehicle picker (inverse of OPT_EXCLUDED_VINS -- the user
+# picks what TO manage, which gets inverted to an exclusion list before saving).
+CONF_MANAGED_VINS = "managed_vins"
+
 COMMAND_MAP = {
     DOOR_LOCK: RemoteRequestCommand.DoorLock,
     DOOR_UNLOCK: RemoteRequestCommand.DoorUnlock,

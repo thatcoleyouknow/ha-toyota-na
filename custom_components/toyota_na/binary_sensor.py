@@ -63,7 +63,7 @@ async def async_setup_entry(
                     stale_entity_id = registry.async_get_entity_id(
                         "binary_sensor",
                         DOMAIN,
-                        f"{coordinator.entry_id}.{vehicle.vin}.{entity_config['name']}",
+                        f"{vehicle.vin}.{entity_config['name']}",
                     )
                     if stale_entity_id:
                         _LOGGER.info(

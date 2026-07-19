@@ -3,6 +3,7 @@
     "domain": "toyota_na",
     "name": "Toyota (North America)",
     "config_flow": true,
+    "homeassistant": "2024.11.0",
     "documentation": "https://github.com/widewing/ha_toyota_na",
     "codeowners": ["@vanstinator, @widewing"],
     "requirements": ["toyota-na==2.1.1"],
