@@ -184,6 +184,26 @@ def async_release_vehicle_claims(hass: HomeAssistant, entry: ConfigEntry) -> Non
             ir.async_delete_issue(hass, DOMAIN, issue_id)
 
 
+def async_prune_unclaimed_devices(
+    hass: HomeAssistant, entry: ConfigEntry, current_vins: set
+) -> None:
+    """Remove this entry's device for any vehicle it previously managed but no longer does --
+    e.g. one the user just excluded via the Configure option, or one lost to another entry in a
+    claim conflict. Removing the device also removes its entities (Home Assistant's entity
+    registry listens for device removal and drops any entity whose config entry matches).
+
+    No platform in this integration proactively removes entities that stop appearing in
+    coordinator.data on their own -- without this, an excluded/lost vehicle's device would
+    otherwise linger in the registry indefinitely, showing unavailable/unknown rather than
+    actually disappearing.
+    """
+    device_registry = dr.async_get(hass)
+    for device in device_registry.devices.get_devices_for_config_entry_id(entry.entry_id):
+        vin = next((ident[1] for ident in device.identifiers if ident[0] == DOMAIN), None)
+        if vin is not None and vin not in current_vins:
+            device_registry.async_update_device(device.id, remove_config_entry_id=entry.entry_id)
+
+
 async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Reload the config entry, but only if the vehicle-exclusion option actually changed.
 
@@ -407,6 +427,7 @@ async def update_vehicles_status(hass: HomeAssistant, client: ToyotaOneClient, e
                 except Exception as e:
                     _LOGGER.warning("Vehicle refresh failed (%s), continuing without refresh", e)
             vehicles.append(vehicle)
+        async_prune_unclaimed_devices(hass, entry, {v.vin for v in vehicles})
         entry_data = dict(entry.data)
         if need_refresh:
             entry_data["last_refreshed_at"] = datetime.utcnow().timestamp()
