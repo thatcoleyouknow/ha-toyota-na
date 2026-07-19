@@ -106,6 +106,7 @@ class ToyotaVehicle(ABC):
     _region: str
     _backdoor_type: Union[str, None]
     _capabilities: dict
+    _api_generation: Union[str, None]
 
     # Maps a command to the remoteServiceCapabilities flag that indicates whether Toyota
     # reports this vehicle as actually supporting it. Commands with no entry here (e.g.
@@ -131,6 +132,7 @@ class ToyotaVehicle(ABC):
         generation: ApiVehicleGeneration,
         backdoor_type: Union[str, None] = None,
         capabilities: Union[dict, None] = None,
+        api_generation: Union[str, None] = None,
     ):
         """
         Initialize a new vehicle object. Must call `vehicle.update()` to fully populate the object.
@@ -142,6 +144,11 @@ class ToyotaVehicle(ABC):
         :param capabilities: The vehicle's remoteServiceCapabilities dict from the Toyota API,
             used to avoid sending remote commands Toyota has already told us this vehicle
             doesn't support (e.g. hazards on trucks that lack that capability).
+        :param api_generation: The raw generation string from the vehicle-list API response
+            (e.g. "17CYPLUS", "21MM", "24MM") -- distinct from `generation`, which several raw
+            API generations are deliberately collapsed into for a single vehicle-generation
+            class. Needed anywhere code cares which of those raw generations a vehicle actually
+            is, e.g. deciding whether it needs the AppSync WebSocket subscription.
         """
 
         self._features = {}
@@ -155,6 +162,7 @@ class ToyotaVehicle(ABC):
         self._region = region
         self._backdoor_type = backdoor_type
         self._capabilities = capabilities or {}
+        self._api_generation = api_generation
 
     @abstractmethod
     async def poll_vehicle_refresh(self) -> None:
@@ -219,6 +227,10 @@ class ToyotaVehicle(ABC):
     @property
     def capabilities(self):
         return self._capabilities
+
+    @property
+    def api_generation(self):
+        return self._api_generation
 
     def supports_command(self, command: "RemoteRequestCommand") -> bool:
         """Whether Toyota's reported remoteServiceCapabilities say this vehicle supports
