@@ -81,6 +81,7 @@ class SeventeenCYPlusToyotaVehicle(ToyotaVehicle):
         region: str,
         backdoor_type: str = None,
         capabilities: dict = None,
+        api_generation: str = None,
     ):
         self._has_remote_subscription = has_remote_subscription
         self._has_electric = has_electric
@@ -97,6 +98,7 @@ class SeventeenCYPlusToyotaVehicle(ToyotaVehicle):
             ApiVehicleGeneration.CY17PLUS,
             backdoor_type,
             capabilities,
+            api_generation,
         )
 
     _last_graphql_status = None  # persist last successful GraphQL status

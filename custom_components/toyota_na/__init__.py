@@ -194,9 +194,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     )
     await coordinator.async_config_entry_first_refresh()
 
-    # Start WebSocket handler for vehicle status push notifications (21MM+)
+    # Start WebSocket handler for vehicle status push notifications. Only for 21MM/24MM --
+    # 17CYPLUS is confirmed to work fully via REST alone (verified via live testing), so there's
+    # no reason to open a WebSocket connection for it. 21MM/24MM keep it as a fallback: this
+    # integration is used by vehicles we haven't personally tested, and REST working for our
+    # own 21MM vehicle (once account permissions and the value-shape parsing were fixed) isn't
+    # proof it's sufficient for every account/vehicle combination on this generation.
     ws_handler = ToyotaWebSocketHandler(client)
-    vins = [v.vin for v in coordinator.data if v.subscribed] if coordinator.data else []
+    vins = (
+        [v.vin for v in coordinator.data if v.subscribed and v.api_generation != "17CYPLUS"]
+        if coordinator.data
+        else []
+    )
     if vins:
         await ws_handler.start(vins)
     client._ws_handler = ws_handler

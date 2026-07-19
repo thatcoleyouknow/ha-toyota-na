@@ -14,10 +14,11 @@ async def get_vehicles(client: ToyotaOneClient) -> list[ToyotaVehicle]:
     for (i, vehicle) in enumerate(api_vehicles):
         if vehicle["generation"] not in supportedGenerations:
             continue
+        api_generation = vehicle["generation"]
         if (
-            ApiVehicleGeneration(vehicle["generation"]) == ApiVehicleGeneration.CY17PLUS
-            or ApiVehicleGeneration(vehicle["generation"]) == ApiVehicleGeneration.MM21
-            or ApiVehicleGeneration(vehicle["generation"]) == ApiVehicleGeneration.MM24
+            ApiVehicleGeneration(api_generation) == ApiVehicleGeneration.CY17PLUS
+            or ApiVehicleGeneration(api_generation) == ApiVehicleGeneration.MM21
+            or ApiVehicleGeneration(api_generation) == ApiVehicleGeneration.MM24
         ):
             vehicle = SeventeenCYPlusToyotaVehicle(
                 client=client,
@@ -29,6 +30,7 @@ async def get_vehicles(client: ToyotaOneClient) -> list[ToyotaVehicle]:
                 region=vehicle["region"],
                 backdoor_type=vehicle.get("backdoorType"),
                 capabilities=vehicle.get("remoteServiceCapabilities"),
+                api_generation=api_generation,
             )
 
         elif ApiVehicleGeneration(vehicle["generation"]) == ApiVehicleGeneration.CY17:
