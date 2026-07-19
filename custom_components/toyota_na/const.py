@@ -30,6 +30,33 @@ COMMAND_MAP = {
     REFRESH: RemoteRequestCommand.Refresh,
 }
 
+# door_lock/door_unlock are deliberately excluded -- the `lock` platform already provides
+# native Lock/Unlock controls for those via the vehicle's Lock entity, so a button would
+# just be redundant. Refresh isn't here either; it needs a different call path
+# (poll_vehicle_refresh(), not send_command()) so it's handled as its own entity class.
+COMMAND_BUTTONS = [
+    {
+        "command": RemoteRequestCommand.EngineStart,
+        "icon": "mdi:engine-outline",
+        "name": "Remote Start",
+    },
+    {
+        "command": RemoteRequestCommand.EngineStop,
+        "icon": "mdi:engine-off-outline",
+        "name": "Remote Stop",
+    },
+    {
+        "command": RemoteRequestCommand.HazardsOn,
+        "icon": "mdi:hazard-lights",
+        "name": "Hazards On",
+    },
+    {
+        "command": RemoteRequestCommand.HazardsOff,
+        "icon": "mdi:hazard-lights",
+        "name": "Hazards Off",
+    },
+]
+
 BINARY_SENSORS = [
     {
         "device_class": BinarySensorDeviceClass.DOOR,
