@@ -61,7 +61,9 @@ async def async_setup_entry(
                 )
                 if unsupported_backdoor_types and vehicle.backdoor_type in unsupported_backdoor_types:
                     stale_entity_id = registry.async_get_entity_id(
-                        "binary_sensor", DOMAIN, f"{vehicle.vin}.{entity_config['name']}"
+                        "binary_sensor",
+                        DOMAIN,
+                        f"{coordinator.entry_id}.{vehicle.vin}.{entity_config['name']}",
                     )
                     if stale_entity_id:
                         _LOGGER.info(

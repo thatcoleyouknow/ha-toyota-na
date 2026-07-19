@@ -35,7 +35,10 @@ class ToyotaNABaseEntity(CoordinatorEntity[list[ToyotaVehicle]]):
 
     @property
     def unique_id(self):
-        return f"{self.vin}.{self.sensor_name}"
+        # Namespaced by config entry so the same VIN visible to two different Toyota accounts
+        # (e.g. a family-shared vehicle) never collides -- see the comment where entry_id is
+        # set on the coordinator in __init__.py for why this matters.
+        return f"{self.coordinator.entry_id}.{self.vin}.{self.sensor_name}"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -45,7 +48,7 @@ class ToyotaNABaseEntity(CoordinatorEntity[list[ToyotaVehicle]]):
             model = f"{self.vehicle.model_year} {self.vehicle.model_name}"
 
         return {
-            "identifiers": {(DOMAIN, self.vin)},
+            "identifiers": {(DOMAIN, f"{self.coordinator.entry_id}.{self.vin}")},
             "name": model,
             "model": model,
             "manufacturer": "Toyota Motor North America",

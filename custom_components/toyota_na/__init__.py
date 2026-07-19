@@ -185,6 +185,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         _LOGGER.exception(e)
         raise ConfigEntryAuthFailed(e) from e
 
+    # Reuse a stable device ID across restarts instead of letting a fresh one get generated
+    # every time. Without this, every HA restart (and every standalone script run during
+    # development) looks to Toyota like a brand new, never-before-seen device -- and Toyota's
+    # backend appears to cap how many concurrent devices can hold an active subscription per
+    # vehicle (see the "device limit exceeded?" handling in websocket_handler.py), so repeated
+    # restarts during development can plausibly exhaust that cap on their own.
+    if "device_id" in entry.data:
+        client.auth.set_device_id(entry.data["device_id"])
+    else:
+        entry_data = dict(entry.data)
+        entry_data["device_id"] = client.auth.get_device_id()
+        hass.config_entries.async_update_entry(entry, data=entry_data)
+
     coordinator = DataUpdateCoordinator(
         hass,
         _LOGGER,
@@ -192,6 +205,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         update_method=lambda: update_vehicles_status(hass, client, entry),
         update_interval=timedelta(seconds=UPDATE_INTERVAL),
     )
+    # Entities key their unique_id/device identifiers off this so that two config entries
+    # (e.g. two Toyota accounts that can both see the same VIN, one family-shared) never
+    # collide -- without it, unique_id was purely vin+sensor_name, so a vehicle visible to
+    # multiple accounts would have every entity "already exists - ignoring" on whichever
+    # config entry loads second, silently binding entities to the wrong account's session.
+    coordinator.entry_id = entry.entry_id
     await coordinator.async_config_entry_first_refresh()
 
     # Start WebSocket handler for vehicle status push notifications. Only for 21MM/24MM --
