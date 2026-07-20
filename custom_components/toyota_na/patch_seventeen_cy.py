@@ -216,7 +216,9 @@ class SeventeenCYToyotaVehicle(ToyotaVehicle):
 
     # Position words mean the value reports open/closed state; lock words mean it reports
     # lock state instead. Some generations report only a single lock-state value with no
-    # position at all, where older shapes report position first, then lock state.
+    # position at all, where older shapes report position first, then lock state. Reverse-
+    # engineered from live payloads (see the identical constants/comment in
+    # patch_seventeen_cy_plus.py), not from Toyota documentation.
     _POSITION_VALUES = ("closed", "open", "opened")
     _LOCK_STATE_VALUES = ("locked", "unlocked")
 
@@ -276,6 +278,9 @@ class SeventeenCYToyotaVehicle(ToyotaVehicle):
                     if not values:
                         continue
                     first_val = values[0].get("value", "").lower()
+                    # Deliberate: an unrecognized first value means skip this section for this
+                    # poll, leaving any existing feature value from a prior poll in place (see
+                    # the identical choice in patch_seventeen_cy_plus.py).
                     if first_val not in self._POSITION_VALUES + self._LOCK_STATE_VALUES:
                         continue
 

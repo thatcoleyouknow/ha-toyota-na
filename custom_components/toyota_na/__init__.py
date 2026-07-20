@@ -202,7 +202,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     # proof it's sufficient for every account/vehicle combination on this generation.
     ws_handler = ToyotaWebSocketHandler(client)
     vins = (
-        [v.vin for v in coordinator.data if v.subscribed and v.api_generation != "17CYPLUS"]
+        [
+            v.vin
+            for v in coordinator.data
+            if v.subscribed and v.api_generation != ApiVehicleGeneration.CY17PLUS.value
+        ]
         if coordinator.data
         else []
     )

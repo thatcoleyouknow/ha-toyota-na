@@ -49,6 +49,9 @@ class SeventeenCYPlusToyotaVehicle(ToyotaVehicle):
         "Other Hood": VehicleFeatures.Hood,
     }
 
+    # "vehicleLocation" is deliberately not mapped here -- it needs a different target entity
+    # class (ToyotaLocation, not ToyotaNumeric) and backs two features at once, so it's handled
+    # as a special case in _parse_telemetry() below instead of through this table.
     _vehicle_telemetry_map = {
         "distanceToEmpty": VehicleFeatures.DistanceToEmpty,
         "flTirePressure": VehicleFeatures.FrontDriverTire,
@@ -112,6 +115,9 @@ class SeventeenCYPlusToyotaVehicle(ToyotaVehicle):
         # closed by telemetry for the same poll). vehicle_status running second means it
         # overwrites telemetry's value when it has one, and simply leaves telemetry's value in
         # place on the (common) polls where vehicle_status doesn't report window state at all.
+        # If NEITHER source reports a given feature on a given poll, its entry in self._features
+        # simply isn't touched -- the entity keeps showing whatever it last had, indefinitely,
+        # with no staleness indicator. Known limitation, not specific to this reordering.
         try:
             # telemetry
             telemetry = await self._client.get_telemetry(self._vin, self._region)
@@ -129,6 +135,12 @@ class SeventeenCYPlusToyotaVehicle(ToyotaVehicle):
                     self._last_vehicle_status = vehicle_status
                     self._parse_vehicle_status(vehicle_status)
                 elif self._last_vehicle_status:
+                    # _last_vehicle_status has no TTL/expiry -- if this account permanently loses
+                    # access (see the warning below), every future poll re-parses this same
+                    # snapshot indefinitely, so door/window/lock entities keep showing that last-
+                    # known state forever rather than going unknown. Predates this warning
+                    # message; noted here since the warning could otherwise read as the whole
+                    # story.
                     self._parse_vehicle_status(self._last_vehicle_status)
 
                 # WebSocket cached data (if available) provides additional detail
@@ -264,6 +276,10 @@ class SeventeenCYPlusToyotaVehicle(ToyotaVehicle):
     # Position words mean the value reports open/closed state; lock words mean it reports
     # lock state instead. Some generations (e.g. 21MM) report only a single lock-state value
     # with no position at all, where older generations report position first, then lock state.
+    # This is reverse-engineered from live payloads (diffing a working vs. a family-shared/
+    # degraded account's response for the same vehicle, plus multiple generations' raw API
+    # captures), not from any Toyota documentation -- there's no guarantee a future generation
+    # or API change won't report a third shape these values don't cover.
     _POSITION_VALUES = ("closed", "open", "opened")
     _LOCK_STATE_VALUES = ("locked", "unlocked")
 
@@ -323,6 +339,10 @@ class SeventeenCYPlusToyotaVehicle(ToyotaVehicle):
                     if not values:
                         continue
                     first_val = values[0].get("value", "").lower()
+                    # Deliberate: an unrecognized first value (e.g. a future third status word
+                    # Toyota starts sending) means we just skip this section for this poll,
+                    # leaving whatever feature value already exists from a prior poll in place,
+                    # rather than guessing at its meaning or clearing the feature to unknown.
                     if first_val not in self._POSITION_VALUES + self._LOCK_STATE_VALUES:
                         continue
 
@@ -397,7 +417,12 @@ class SeventeenCYPlusToyotaVehicle(ToyotaVehicle):
                     pos_status = ((window.get("position") or {}).get("status", "")).lower()
                     self._features[feature] = ToyotaOpening(closed=(pos_status == "closed"))
 
-        # Hatch / Trunk / Tailgate -> mapped to VehicleFeatures.Trunk
+        # Hatch / Trunk / Tailgate -> mapped to VehicleFeatures.Trunk. Assumption (not
+        # confirmed against a payload where more than one key was present): a vehicle's rear
+        # cargo access is exactly one body style, so in practice only one of these three keys
+        # should ever actually be present. If that assumption is wrong for some vehicle, this
+        # order (hatch, then trunk, then tailgate) silently decides which one wins -- not a
+        # deliberate priority choice, just iteration order.
         for opening_key in ("hatch", "trunk", "tailgate"):
             opening = vehicle_state.get(opening_key)
             if opening:

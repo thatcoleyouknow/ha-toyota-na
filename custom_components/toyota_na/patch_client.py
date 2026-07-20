@@ -106,7 +106,10 @@ async def remote_request_17cyplus(self, vin, command):
     # Logged unconditionally (not just on HTTP error) because a "successful" response can
     # still contain an embedded error/job-status Toyota expects the caller to check -- the
     # existing api_request() only logs on HTTP >= 400, which tells us nothing when a command
-    # is silently ignored by the vehicle despite Toyota's cloud accepting the request.
+    # is silently ignored by the vehicle despite Toyota's cloud accepting the request. Logs the
+    # full raw response body, not just a status/error field -- debug-level only (never enabled
+    # by default), but worth checking this response can't ever carry anything sensitive before
+    # broadening what triggers debug logging here or elsewhere in this module.
     _LOGGER.debug(
         "Remote command '%s' for VIN ...%s response: %s", command, vin[-4:], response
     )
@@ -228,7 +231,13 @@ async def graphql_confirm_subscription(self, vin, backdoor_type=None):
 
     backdoor_type should be the vehicle's actual rear cargo access type from the Toyota API
     (e.g. "hatch", "tailgate", "trunk"). Falls back to "hatch" if unknown, matching prior
-    hardcoded behavior, so callers that don't have this data yet don't regress.
+    hardcoded behavior, so callers that don't have this data yet don't regress. "hatch" isn't
+    known to be safe for every vehicle -- it's just what this code always sent before
+    backdoor_type was threaded through, so every caller already exercised that value without
+    apparent issue. A vehicle where "hatch" is actually wrong wouldn't necessarily be obvious
+    from this call alone (see the "no door/lock/hood/trunk status" warning in
+    patch_seventeen_cy_plus.py's update() for one symptom that could, among other causes,
+    stem from this).
     """
     return await self.graphql_request(
         "ConfirmSubscriptionStatus",
