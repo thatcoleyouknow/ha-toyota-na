@@ -30,10 +30,15 @@ class ToyotaNABaseEntity(CoordinatorEntity[list[ToyotaVehicle]]):
 
     @property
     def name(self):
-        # Deliberately just the sensor name, not "{sensor_name} {vehicle model}" -- Home
-        # Assistant already prefixes an entity's friendly name with its device's name in the UI.
-        # Building that prefix manually here produced reversed/doubled names (e.g. "2023
-        # Highlander Front Driver Door 2023 Highlander"). Don't reintroduce it.
+        # Deliberately just the sensor name, not "{sensor_name} {vehicle model}" -- the manual
+        # concatenation this used to do produced confusing/doubled-looking names in the UI
+        # (e.g. a device page showing "2023 Highlander Front Driver Door 2023 Highlander").
+        # Note this class does NOT set `_attr_has_entity_name = True`, so Home Assistant isn't
+        # composing the device name in automatically either -- the friendly name really is just
+        # the bare sensor name (e.g. "Front Driver Door"), distinguished from the same sensor on
+        # another vehicle only by which device it's grouped under, not by the name itself.
+        # Migrating to has_entity_name=True (HA's modern entity-naming convention) would be a
+        # bigger, separate change -- it affects every existing entity_id.
         if self.vehicle is not None:
             return self.sensor_name
 

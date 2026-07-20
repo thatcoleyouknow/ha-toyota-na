@@ -3,12 +3,11 @@
     "domain": "toyota_na",
     "name": "Toyota (North America)",
     "config_flow": true,
-    "homeassistant": "2024.11.0",
     "documentation": "https://github.com/widewing/ha_toyota_na",
     "codeowners": ["@vanstinator, @widewing"],
     "requirements": ["toyota-na==2.1.1"],
     "issue_tracker": "https://github.com/widewing/ha-toyota-na/issues",
-    "version": "2.6.15",
+    "version": "2.6.16",
     "iot_class": "cloud_polling"
 }
 

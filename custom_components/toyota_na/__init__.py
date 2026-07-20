@@ -185,23 +185,45 @@ def async_release_vehicle_claims(hass: HomeAssistant, entry: ConfigEntry) -> Non
 
 
 def async_prune_unclaimed_devices(
-    hass: HomeAssistant, entry: ConfigEntry, current_vins: set
+    hass: HomeAssistant, entry: ConfigEntry, vins_to_prune: set
 ) -> None:
-    """Remove this entry's device for any vehicle it previously managed but no longer does --
-    e.g. one the user just excluded via the Configure option, or one lost to another entry in a
-    claim conflict. Removing the device also removes its entities (Home Assistant's entity
-    registry listens for device removal and drops any entity whose config entry matches).
+    """Remove this entry's device for each VIN in vins_to_prune -- vehicles the user just
+    excluded via the Configure option, or vehicles just lost to another entry in a claim
+    conflict this refresh. Removing the device also removes its entities (Home Assistant's
+    entity registry listens for device removal and drops any entity whose config entry matches).
 
-    No platform in this integration proactively removes entities that stop appearing in
-    coordinator.data on their own -- without this, an excluded/lost vehicle's device would
-    otherwise linger in the registry indefinitely, showing unavailable/unknown rather than
-    actually disappearing.
+    Deliberately NOT "every device whose VIN isn't in this refresh's vehicle list" -- a config
+    entry's devices persist across refreshes, but the vehicle list itself can legitimately come
+    back short (or empty) on a single poll without raising (a Toyota API hiccup, a transient
+    partial response). Since no platform here re-creates an entity once its device is removed
+    (entities are only ever created in each platform's async_setup_entry), pruning on mere
+    absence would delete real, working entities over a one-poll blip, with nothing bringing them
+    back short of a full entry reload. Pruning only for reasons we can positively confirm --  an
+    explicit exclusion, or a claim genuinely lost this cycle -- avoids that risk entirely. A
+    vehicle that's actually gone from the account (e.g. sold) isn't covered by this at all; the
+    user removes that one manually from its device page instead, which
+    async_remove_config_entry_device() below allows.
     """
+    if not vins_to_prune:
+        return
     device_registry = dr.async_get(hass)
-    for device in device_registry.devices.get_devices_for_config_entry_id(entry.entry_id):
+    for device in dr.async_entries_for_config_entry(device_registry, entry.entry_id):
         vin = next((ident[1] for ident in device.identifiers if ident[0] == DOMAIN), None)
-        if vin is not None and vin not in current_vins:
+        if vin is not None and vin in vins_to_prune:
             device_registry.async_update_device(device.id, remove_config_entry_id=entry.entry_id)
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant, entry: ConfigEntry, device_entry: dr.DeviceEntry
+) -> bool:
+    """Let a user manually delete a device from its device page -- the escape hatch for a
+    vehicle async_prune_unclaimed_devices() deliberately won't touch on its own: one that's
+    disappeared from the Toyota account entirely (e.g. sold), rather than being excluded or lost
+    to a claim conflict. Unconditionally allowed: if the vehicle is actually still in this
+    entry's managed set, get_vehicles()/async_claim_vehicles() will just recreate the device on
+    the entry's next refresh, the same as manually deleting any other still-present device would.
+    """
+    return True
 
 
 async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -418,8 +440,13 @@ async def update_vehicles_status(hass: HomeAssistant, client: ToyotaOneClient, e
             # An explicit exclusion resolves any prior conflict from this entry's side.
             ir.async_delete_issue(hass, DOMAIN, _shared_vehicle_issue_id(vin, entry.entry_id))
 
-        raw_vehicles = await get_vehicles(client, exclude_vins=user_excluded_vins)
-        raw_vehicles = async_claim_vehicles(hass, entry, raw_vehicles)
+        fetched_vehicles = await get_vehicles(client, exclude_vins=user_excluded_vins)
+        raw_vehicles = async_claim_vehicles(hass, entry, fetched_vehicles)
+        # Vehicles this entry actually fetched (so we know they still exist on the account) but
+        # didn't win the claim for this cycle -- distinct from a vehicle simply missing from a
+        # possibly-incomplete fetch. See async_prune_unclaimed_devices() for why this distinction
+        # matters.
+        lost_to_conflict = {v.vin for v in fetched_vehicles} - {v.vin for v in raw_vehicles}
 
         vehicles: list[ToyotaVehicle] = []
         for vehicle in raw_vehicles:
@@ -438,7 +465,7 @@ async def update_vehicles_status(hass: HomeAssistant, client: ToyotaOneClient, e
                 except Exception as e:
                     _LOGGER.warning("Vehicle refresh failed (%s), continuing without refresh", e)
             vehicles.append(vehicle)
-        async_prune_unclaimed_devices(hass, entry, {v.vin for v in vehicles})
+        async_prune_unclaimed_devices(hass, entry, user_excluded_vins | lost_to_conflict)
         entry_data = dict(entry.data)
         if need_refresh:
             entry_data["last_refreshed_at"] = datetime.utcnow().timestamp()

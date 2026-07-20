@@ -28,19 +28,21 @@ async def async_setup_entry(
     ]["coordinator"]
 
     for vehicle in coordinator.data:
-        if vehicle.subscribed is False:
-            continue
-
         # "Hazards Off" was removed from COMMAND_BUTTONS (see the comment there -- it never
         # visibly did anything on a real vehicle). Clean up any button entity a previous
-        # version of this integration already created for it, so existing installs don't keep
-        # a dead button around, the same way binary_sensor.py cleans up structurally-
-        # unsupported entities.
+        # version of this integration already created for it (this fork shipped a couple of
+        # interim HACS releases with it present before this fix), so those installs don't keep
+        # a dead button around, the same way binary_sensor.py cleans up structurally-unsupported
+        # entities. Runs before the subscribed-check below so a vehicle whose subscription has
+        # since lapsed still gets its stale button cleaned up rather than skipped over.
         stale_entity_id = registry.async_get_entity_id(
             "button", DOMAIN, f"{vehicle.vin}.Hazards Off"
         )
         if stale_entity_id:
             registry.async_remove(stale_entity_id)
+
+        if vehicle.subscribed is False:
+            continue
 
         for button_config in COMMAND_BUTTONS:
             command = cast(RemoteRequestCommand, button_config["command"])
