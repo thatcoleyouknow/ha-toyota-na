@@ -44,6 +44,12 @@ class ToyotaNABaseEntity(CoordinatorEntity[list[ToyotaVehicle]]):
 
     @property
     def unique_id(self):
+        # Plain vin+sensor_name, no config-entry namespacing. A vehicle visible to two Toyota
+        # accounts (Toyota "family sharing") could in principle collide here if both accounts'
+        # entries tried to create entities for the same VIN -- that's prevented by only ever
+        # letting one config entry create entities for a given VIN in the first place (the VIN
+        # claim guard in __init__.py, see async_claim_vehicles()). That external invariant is
+        # what keeps this safe; it isn't enforced by anything in this file.
         return f"{self.vin}.{self.sensor_name}"
 
     @property

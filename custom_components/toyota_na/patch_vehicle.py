@@ -1,3 +1,5 @@
+from typing import Union
+
 from toyota_na.client import ToyotaOneClient
 from toyota_na.vehicle.base_vehicle import (
     ApiVehicleGeneration,
@@ -6,13 +8,20 @@ from toyota_na.vehicle.base_vehicle import (
 from toyota_na.vehicle.vehicle_generations.seventeen_cy import SeventeenCYToyotaVehicle
 from toyota_na.vehicle.vehicle_generations.seventeen_cy_plus import SeventeenCYPlusToyotaVehicle
 
-async def get_vehicles(client: ToyotaOneClient) -> list[ToyotaVehicle]:
+async def get_vehicles(
+    client: ToyotaOneClient, exclude_vins: Union[set, None] = None
+) -> list[ToyotaVehicle]:
+    """:param exclude_vins: VINs to skip entirely (no vehicle object constructed, no API calls
+    made for them) -- vehicles a user has explicitly excluded via the Configure option."""
+    exclude_vins = exclude_vins or set()
     api_vehicles = await client.get_user_vehicle_list()
     supportedGenerations = dict((item.value, item) for item in ApiVehicleGeneration)
     vehicles = []
 
     for (i, vehicle) in enumerate(api_vehicles):
         if vehicle["generation"] not in supportedGenerations:
+            continue
+        if vehicle["vin"] in exclude_vins:
             continue
         api_generation = vehicle["generation"]
         if (
