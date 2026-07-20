@@ -48,6 +48,18 @@ COMMAND_MAP = {
 # native Lock/Unlock controls for those via the vehicle's Lock entity, so a button would
 # just be redundant. Refresh isn't here either; it needs a different call path
 # (poll_vehicle_refresh(), not send_command()) so it's handled as its own entity class.
+#
+# HazardsOff is deliberately excluded too, unlike every other on/off pair here. Toyota's API
+# accepts a distinct "hazard-off" command (it's not an alias of "hazard-on" -- see
+# RemoteRequestCommand/the generation-specific command maps in patch_seventeen_cy(_plus).py),
+# but live testing showed pressing it has no observable effect on the vehicle, matching the
+# Toyota app's own behavior (hazards there are momentary -- they turn on and auto-stop after
+# ~60s, with no manual "off" available even from Toyota's own app). Best guess: Toyota's
+# remote-hazards feature is on/timeout-off only, and the cloud API silently accepts an "off"
+# request it doesn't actually act on. HazardsOn is kept since turning hazards on remotely is a
+# real, working, useful command. The button.py setup below also removes any "Hazards Off"
+# button entity a previous version of this integration already created, so existing installs
+# don't end up with a stale, non-functional button lingering in the registry.
 COMMAND_BUTTONS = [
     {
         "command": RemoteRequestCommand.EngineStart,
@@ -63,11 +75,6 @@ COMMAND_BUTTONS = [
         "command": RemoteRequestCommand.HazardsOn,
         "icon": "mdi:hazard-lights",
         "name": "Hazards On",
-    },
-    {
-        "command": RemoteRequestCommand.HazardsOff,
-        "icon": "mdi:hazard-lights",
-        "name": "Hazards Off",
     },
 ]
 

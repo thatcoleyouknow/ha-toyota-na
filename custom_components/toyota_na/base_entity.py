@@ -30,11 +30,22 @@ class ToyotaNABaseEntity(CoordinatorEntity[list[ToyotaVehicle]]):
 
     @property
     def name(self):
+        # Deliberately just the sensor name, not "{sensor_name} {vehicle model}" -- Home
+        # Assistant already prefixes an entity's friendly name with its device's name in the UI.
+        # Building that prefix manually here produced reversed/doubled names (e.g. "2023
+        # Highlander Front Driver Door 2023 Highlander"). Don't reintroduce it.
         if self.vehicle is not None:
             return self.sensor_name
 
     @property
     def unique_id(self):
+        # Plain vin+sensor_name, no config-entry namespacing. A vehicle visible to two Toyota
+        # accounts (Toyota "family sharing") could in principle collide here if both accounts'
+        # entries tried to create entities for the same VIN -- entry_id namespacing was tried
+        # for this (see git history) and reverted in favor of a different fix: only one config
+        # entry is ever allowed to create entities for a given VIN in the first place (the VIN
+        # claim guard in __init__.py, see async_claim_vehicles()). That external invariant is
+        # what keeps this safe; it isn't enforced by anything in this file.
         return f"{self.vin}.{self.sensor_name}"
 
     @property

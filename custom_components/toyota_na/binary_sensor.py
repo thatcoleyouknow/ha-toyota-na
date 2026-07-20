@@ -27,6 +27,13 @@ _LOGGER = logging.getLogger(__name__)
 # created once (e.g. under an older integration version) and then orphaned into permanent
 # "unavailable" once the code correctly stopped populating them -- Home Assistant doesn't
 # prune entities a platform silently stops providing, so without this they linger forever.
+#
+# Only Trunk/"tailgate" is listed because it's the only case actually confirmed via live
+# testing (a pickup truck's tailgate reports as `backdoor_type: "tailgate"`, and the API never
+# sends a Trunk feature value for it). Other body-style mismatches may well exist (e.g. no
+# moonroof, no rear doors on a 2-door) but haven't been observed/confirmed -- add an entry here
+# the same way, keyed by whatever `backdoor_type` (or other vehicle attribute) value structurally
+# rules the feature out, once one is confirmed.
 _STRUCTURALLY_UNSUPPORTED_BACKDOOR_TYPES = {
     VehicleFeatures.Trunk: {"tailgate"},
 }
@@ -60,6 +67,10 @@ async def async_setup_entry(
                     feature_sensor["feature"]
                 )
                 if unsupported_backdoor_types and vehicle.backdoor_type in unsupported_backdoor_types:
+                    # Rebuilds ToyotaNABaseEntity.unique_id's format (base_entity.py) by hand,
+                    # since there's no entity object here yet to ask -- if that format ever
+                    # changes, this must change with it or stale-entity cleanup silently stops
+                    # matching anything.
                     stale_entity_id = registry.async_get_entity_id(
                         "binary_sensor",
                         DOMAIN,

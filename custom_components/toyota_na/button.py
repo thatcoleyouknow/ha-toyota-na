@@ -6,6 +6,7 @@ from toyota_na.vehicle.base_vehicle import RemoteRequestCommand, ToyotaVehicle
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
@@ -20,6 +21,7 @@ async def async_setup_entry(
 ):
     """Set up the button platform."""
     buttons = []
+    registry = er.async_get(hass)
 
     coordinator: DataUpdateCoordinator[list[ToyotaVehicle]] = hass.data[DOMAIN][
         config_entry.entry_id
@@ -29,8 +31,25 @@ async def async_setup_entry(
         if vehicle.subscribed is False:
             continue
 
+        # "Hazards Off" was removed from COMMAND_BUTTONS (see the comment there -- it never
+        # visibly did anything on a real vehicle). Clean up any button entity a previous
+        # version of this integration already created for it, so existing installs don't keep
+        # a dead button around, the same way binary_sensor.py cleans up structurally-
+        # unsupported entities.
+        stale_entity_id = registry.async_get_entity_id(
+            "button", DOMAIN, f"{vehicle.vin}.Hazards Off"
+        )
+        if stale_entity_id:
+            registry.async_remove(stale_entity_id)
+
         for button_config in COMMAND_BUTTONS:
             command = cast(RemoteRequestCommand, button_config["command"])
+            # Vehicles that don't support a command (per Toyota's remoteServiceCapabilities,
+            # e.g. hazards on a truck without that capability) never get the button entity
+            # created at all, rather than creating it and marking it unavailable/disabled. This
+            # keeps a vehicle's dashboard free of buttons that can never work for it, at the
+            # cost of the button not reappearing on its own if Toyota later reports the
+            # capability as supported -- that would need a reload to pick up.
             if not vehicle.supports_command(command):
                 continue
             buttons.append(
@@ -84,7 +103,19 @@ class ToyotaCommandButton(ToyotaNABaseEntity, ButtonEntity):
         self.hass.async_create_task(self._background_refresh())
 
     async def _background_refresh(self):
-        """Poll for updated vehicle state after a command, then refresh the coordinator."""
+        """Poll for updated vehicle state after a command, then refresh the coordinator.
+
+        The 10-second sleep gives Toyota's backend time to actually process the command and the
+        vehicle time to report its new state before we ask for it -- polling immediately tends
+        to just re-fetch the pre-command state. Runs as a fire-and-forget background task (see
+        async_press()) so the button press itself returns immediately rather than blocking on
+        this; failures here are swallowed rather than raised because there's nothing meaningful
+        to surface for a background poll -- the command itself already succeeded or failed on
+        its own, and the next scheduled coordinator refresh will pick up the real state
+        regardless. Mirrors the same pattern used for the REFRESH service in __init__.py's
+        async_service_handle -- see the TODO there for the same reasoning, and consider fixing
+        both places together if this ever moves into the library.
+        """
         try:
             await self.vehicle.poll_vehicle_refresh()
             await asyncio.sleep(10)
@@ -103,7 +134,14 @@ class ToyotaRefreshButton(ToyotaNABaseEntity, ButtonEntity):
         return self.vehicle is not None
 
     async def async_press(self) -> None:
-        """Force Toyota to push a fresh status, then refresh the coordinator."""
+        """Force Toyota to push a fresh status, then refresh the coordinator.
+
+        The async_set_updated_data() call re-pushes the coordinator's *existing* data -- it
+        looks like a no-op, but its purpose is to make every entity re-evaluate right away (e.g.
+        pick up this button's own state/attributes changing) rather than wait for the real
+        refresh below, which is deliberately delayed. See _background_refresh() on
+        ToyotaCommandButton above for why the delay exists.
+        """
         if self.vehicle is None:
             return
         await self.vehicle.poll_vehicle_refresh()

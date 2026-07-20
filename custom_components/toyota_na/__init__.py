@@ -266,11 +266,18 @@ async def async_setup(hass: HomeAssistant, _processed_config) -> bool:
             _LOGGER.warning("No loaded config entry currently manages VIN ...%s", vin[-4:])
             return
 
+        # REFRESH and every other command (lock, hazards, engine start/stop) are handled in one
+        # loop/if-elif rather than as separate functions because they share the vin-matching
+        # loop and the trailing log line -- REFRESH's branch is a different call path
+        # (poll_vehicle_refresh() + a manual coordinator nudge, see the TODO below) than the
+        # generic send_command() path every other service uses.
         for vehicle in coordinator.data:
             if vehicle.vin == vin and remote_action.upper() == "REFRESH" and vehicle.subscribed:
                 await vehicle.poll_vehicle_refresh()
                 # TODO: This works great and prevents us from unnecessarily hitting Toyota. But we can and should
                 # probably do stuff like this in the library where we can better control which APIs we hit to refresh our in-memory data.
+                # Same delayed-refresh pattern as button.py's ToyotaCommandButton/ToyotaRefreshButton --
+                # see the comments there for why the sleep and the extra async_set_updated_data exist.
                 coordinator.async_set_updated_data(coordinator.data)
                 await asyncio.sleep(10)
                 await coordinator.async_request_refresh()
@@ -354,7 +361,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         # generation.
         ws_handler = ToyotaWebSocketHandler(client)
         vins = (
-            [v.vin for v in coordinator.data if v.subscribed and v.api_generation != "17CYPLUS"]
+            [
+                v.vin
+                for v in coordinator.data
+                if v.subscribed and v.api_generation != ApiVehicleGeneration.CY17PLUS.value
+            ]
             if coordinator.data
             else []
         )
